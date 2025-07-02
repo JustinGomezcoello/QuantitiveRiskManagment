@@ -1,7 +1,7 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Network, TrendingUp } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface RiskMatrixProps {
   assets: any[];
@@ -67,21 +67,45 @@ export const RiskMatrix = ({ assets, vulnerabilities }: RiskMatrixProps) => {
                   const assetsInCell = positionedAssets.filter(a => a.x === prob && a.y === impact);
                   
                   return (
-                    <div
-                      key={`${prob}-${impact}`}
-                      className={`${riskInfo.color} p-3 min-h-[60px] flex flex-col items-center justify-center relative`}
-                    >
-                      <span className={`text-xs font-bold ${riskInfo.textColor}`}>
-                        {prob * impact}
-                      </span>
-                      {assetsInCell.map((asset, idx) => (
-                        <div
-                          key={idx}
-                          className="absolute top-0 right-0 w-2 h-2 bg-white rounded-full transform translate-x-1 -translate-y-1"
-                          title={asset.service}
-                        />
-                      ))}
-                    </div>
+                    <TooltipProvider key={`${prob}-${impact}`}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div
+                            className={`${riskInfo.color} p-3 min-h-[60px] flex flex-col items-center justify-center relative cursor-pointer`}
+                          >
+                            <span className={`text-xs font-bold ${riskInfo.textColor}`}>
+                              {prob * impact}
+                            </span>
+                            {assetsInCell.length > 0 && (
+                              <div className="flex items-center mt-1">
+                                <span className="text-white text-xs font-semibold">
+                                  {assetsInCell.length}
+                                </span>
+                                <span className="ml-1 text-slate-200 text-xs">activo(s)</span>
+                              </div>
+                            )}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent className="bg-slate-800 border-slate-600 text-white max-w-xs">
+                          {assetsInCell.length === 0 ? (
+                            <span>No assets</span>
+                          ) : (
+                            <div>
+                              <div className="font-bold mb-1">Activos en esta celda:</div>
+                              <ul className="list-disc pl-4">
+                                {assetsInCell.map((asset, idx) => (
+                                  <li key={idx} className="mb-1">
+                                    <span className="font-semibold">{asset.service}</span> <span className="text-slate-400">({asset.version})</span>
+                                    <br />
+                                    <span className="text-xs">Riesgo: {asset.riskScore}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   );
                 })}
               </div>

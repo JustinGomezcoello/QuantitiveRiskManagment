@@ -146,10 +146,10 @@ router.post('/', async (req, res) => {
 
       // 8. Priorización y tratamiento
       const priorizados = activosConRiesgo.sort((a, b) => b.riesgo - a.riesgo).map(a => {
-        let tratamiento = 'Aceptar';
-        if (a.riesgo >= 40) tratamiento = 'Evitar';
-        else if (a.riesgo >= 20) tratamiento = 'Mitigar';
-        else if (a.riesgo >= 10) tratamiento = 'Transferir';
+        let tratamiento = 'ACCEPT';
+        if (a.riesgo >= 40) tratamiento = 'AVOID';
+        else if (a.riesgo >= 20) tratamiento = 'MITIGATE';
+        else if (a.riesgo >= 10) tratamiento = 'TRANSFER';
         return { ...a, tratamiento };
       });
 

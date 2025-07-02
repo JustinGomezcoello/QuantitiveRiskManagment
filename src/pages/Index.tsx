@@ -27,6 +27,7 @@ import { VulnerabilityList } from "@/components/qrms/VulnerabilityList";
 import { AssetInventory } from "@/components/qrms/AssetInventory";
 import { ScanProgress } from "@/components/qrms/ScanProgress";
 import { ThreatIntel } from "@/components/qrms/ThreatIntel";
+import { RiskPrioritizationTable } from "@/components/qrms/RiskPrioritizationTable";
 
 const Index = () => {
   const [ip, setIp] = useState("");
@@ -189,6 +190,10 @@ const Index = () => {
                 <Network className="h-4 w-4 mr-2" />
                 Risk Matrix
               </TabsTrigger>
+              <TabsTrigger value="prioritization" className="data-[state=active]:bg-blue-600">
+                <TrendingUp className="h-4 w-4 mr-2" />
+                Prioritization
+              </TabsTrigger>
               <TabsTrigger value="intel" className="data-[state=active]:bg-blue-600">
                 <Eye className="h-4 w-4 mr-2" />
                 Threat Intel
@@ -217,6 +222,10 @@ const Index = () => {
 
             <TabsContent value="risk-matrix">
               <RiskMatrix assets={assets} vulnerabilities={vulnerabilities} />
+            </TabsContent>
+
+            <TabsContent value="prioritization">
+              <RiskPrioritizationTable assets={scanData?.activos || []} />
             </TabsContent>
 
             <TabsContent value="intel">

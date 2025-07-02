@@ -29,6 +29,8 @@ export const ThreatIntel = ({ ip, shodanData }: ThreatIntelProps) => {
   }));
   const riskScore = shodanData.risk || shodanData.riskScore || "-";
   const tags = shodanData.tags || [];
+  // Extraer CVEs si existen en shodanData
+  const cves = shodanData.cves || shodanData.vulnerabilities || [];
 
   return (
     <div className="space-y-6">
@@ -100,6 +102,36 @@ export const ThreatIntel = ({ ip, shodanData }: ThreatIntelProps) => {
                   <Badge key={index} className="text-blue-400 border-blue-400 border" variant="outline">
                     {tag}
                   </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* CVEs y Vulnerabilidades */}
+          {cves.length > 0 && (
+            <div>
+              <h4 className="text-sm font-medium text-slate-300 mb-2">Vulnerabilidades detectadas (NVD):</h4>
+              <div className="space-y-2">
+                {cves.map((cve: any, idx: number) => (
+                  <div key={idx} className="flex items-center justify-between p-2 bg-slate-700/50 rounded">
+                    <div className="flex flex-col">
+                      <a
+                        href={`https://nvd.nist.gov/vuln/detail/${cve.id || cve.CVE || cve.cve}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-400 font-semibold hover:underline"
+                        title="Ver detalle en NVD"
+                      >
+                        {cve.id || cve.CVE || cve.cve}
+                      </a>
+                      <span className="text-slate-400 text-xs">{cve.summary || cve.description || "Sin resumen"}</span>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <span className="text-xs text-slate-300">CVSS: {cve.score || cve.cvss || "-"}</span>
+                      <span className="text-xs text-slate-300">Severidad: {cve.severity || "-"}</span>
+                      <span className="text-xs text-slate-300">Fecha: {cve.published || cve.date || "-"}</span>
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>

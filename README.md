@@ -1,3 +1,22 @@
+# QRMS - Quantitative Risk Management System
+
+## 🚀 Run with Docker
+
+Build and start the entire project (frontend + backend) with one command:
+
+```sh
+# Build the Docker image
+ docker build -t qrms .
+
+# Run the container
+ docker run -p 80:80 -p 4000:4000 qrms
+```
+
+- The frontend will be available at http://localhost (port 80)
+- The backend API will be available at http://localhost:4000 (direct) and proxied as /api from the frontend
+
+---
+
 # Welcome to your Lovable project
 
 ## Project info

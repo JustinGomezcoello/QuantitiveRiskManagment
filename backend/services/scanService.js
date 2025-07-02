@@ -10,10 +10,10 @@ const router = express.Router();
 // Utilidad para clasificar servicios
 function classifyService(service) {
   const name = service.name.toLowerCase();
-  if (name.includes('mysql') || name.includes('postgres') || name.includes('mongo') || name.includes('db')) return 'Base de datos';
-  if (name.includes('http') || name.includes('apache') || name.includes('nginx') || name.includes('iis')) return 'Infraestructura';
-  if (name.includes('app') || name.includes('web') || name.includes('api')) return 'Aplicación';
-  return 'Infraestructura';
+  if (name.includes('mysql') || name.includes('postgres') || name.includes('mongo') || name.includes('db')) return 'database';
+  if (name.includes('http') || name.includes('apache') || name.includes('nginx') || name.includes('iis')) return 'infrastructure';
+  if (name.includes('app') || name.includes('web') || name.includes('api')) return 'application';
+  return 'infrastructure';
 }
 
 // Utilidad para calcular CIA (dummy, puedes mejorarla)

@@ -77,6 +77,8 @@ const Index = () => {
   const assets = scanData?.activos?.map(a => ({
     service: `${a.name} ${a.product}`,
     version: a.version,
+    port: a.port,
+    type: a.tipo?.toLowerCase() || "infrastructure",
     cia: `${a.cia.confidencialidad}/${a.cia.integridad}/${a.cia.disponibilidad}`,
     riskScore: a.riesgo,
     probability: a.probabilidad,
@@ -213,11 +215,19 @@ const Index = () => {
             </TabsContent>
 
             <TabsContent value="assets">
-              <AssetInventory assets={assets} />
+              {assets.length === 0 ? (
+                <div className="text-center text-slate-400 py-8">No assets detected for this IP.</div>
+              ) : (
+                <AssetInventory assets={assets} />
+              )}
             </TabsContent>
 
             <TabsContent value="vulnerabilities">
-              <VulnerabilityList vulnerabilities={vulnerabilities} />
+              {vulnerabilities.length === 0 ? (
+                <div className="text-center text-slate-400 py-8">No vulnerabilities detected for this IP.</div>
+              ) : (
+                <VulnerabilityList vulnerabilities={vulnerabilities} />
+              )}
             </TabsContent>
 
             <TabsContent value="risk-matrix">

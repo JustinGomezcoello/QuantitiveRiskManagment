@@ -4,8 +4,19 @@ import fs from 'fs';
 import { parseStringPromise } from 'xml2js';
 import fetch from 'node-fetch';
 import path from 'path';
+import PDFDocument from 'pdfkit';
 
 const router = express.Router();
+
+const OBS_DB_PATH = path.join(process.cwd(), 'report_observations.json');
+
+function loadObservations() {
+  if (!fs.existsSync(OBS_DB_PATH)) return {};
+  return JSON.parse(fs.readFileSync(OBS_DB_PATH, 'utf8'));
+}
+function saveObservations(data) {
+  fs.writeFileSync(OBS_DB_PATH, JSON.stringify(data, null, 2));
+}
 
 // Utilidad para clasificar servicios
 function classifyService(service) {
@@ -106,11 +117,23 @@ router.post('/', async (req, res) => {
             const nvdData = await nvdRes.json();
             cves = (nvdData.vulnerabilities || []).map(v => {
               const cve = v.cve;
-              const cvss = cve.metrics?.cvssMetricV31?.[0]?.cvssData || {};
+              // Mejorar el mapeo de score/severity
+              let score = null;
+              let severity = null;
+              if (cve.metrics?.cvssMetricV31?.[0]?.cvssData) {
+                score = cve.metrics.cvssMetricV31[0].cvssData.baseScore;
+                severity = cve.metrics.cvssMetricV31[0].cvssData.baseSeverity;
+              } else if (cve.metrics?.cvssMetricV30?.[0]?.cvssData) {
+                score = cve.metrics.cvssMetricV30[0].cvssData.baseScore;
+                severity = cve.metrics.cvssMetricV30[0].cvssData.baseSeverity;
+              } else if (cve.metrics?.cvssMetricV2?.[0]?.cvssData) {
+                score = cve.metrics.cvssMetricV2[0].cvssData.baseScore;
+                severity = cve.metrics.cvssMetricV2[0].baseSeverity || null;
+              }
               return {
                 id: cve.id,
-                score: cvss.baseScore || null,
-                severity: cvss.baseSeverity || null,
+                score: score,
+                severity: severity,
                 published: cve.published,
                 summary: cve.descriptions?.[0]?.value || '',
                 url: `https://nvd.nist.gov/vuln/detail/${cve.id}`
@@ -154,19 +177,98 @@ router.post('/', async (req, res) => {
       });
 
       // 9. Respuesta final
-      res.json({
+      const response = {
         ip,
         os,
         shodan: shodanData,
         activos: priorizados,
         heatmap,
         timestamp: new Date().toISOString()
-      });
+      };
+      // Guardar el resultado del escaneo para reportes PDF
+      fs.writeFileSync(path.join(process.cwd(), `last_scan_${ip}.json`), JSON.stringify(response, null, 2));
+      res.json(response);
     } catch (err) {
       console.error('Processing failed:', err);
       res.status(500).json({ error: 'Processing failed', details: err.message });
     }
   });
+});
+
+// Endpoint para guardar observación
+router.post('/report/observation', (req, res) => {
+  const { ip, cve, observation } = req.body;
+  if (!ip || !cve) return res.status(400).json({ error: 'Missing ip or cve' });
+  const db = loadObservations();
+  if (!db[ip]) db[ip] = {};
+  db[ip][cve] = observation;
+  saveObservations(db);
+  res.json({ success: true });
+});
+
+// Endpoint para obtener observaciones por IP
+router.get('/report/observations', (req, res) => {
+  const { ip } = req.query;
+  if (!ip) return res.status(400).json({ error: 'Missing ip' });
+  const db = loadObservations();
+  res.json(db[ip] || {});
+});
+
+// Endpoint para exportar PDF
+router.get('/report/pdf', async (req, res) => {
+  const { ip } = req.query;
+  if (!ip) return res.status(400).json({ error: 'Missing ip' });
+  try {
+    const scanPath = path.join(process.cwd(), `last_scan_${ip}.json`);
+    if (!fs.existsSync(scanPath)) {
+      // Devuelve un PDF con mensaje de error
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=report_${ip}.pdf`);
+      const doc = new PDFDocument();
+      doc.pipe(res);
+      doc.fontSize(18).text('QRMS - Vulnerability Report', { align: 'center' });
+      doc.moveDown();
+      doc.fontSize(14).fillColor('red').text('No scan data found for this IP.', { align: 'center' });
+      doc.end();
+      return;
+    }
+    const scanData = JSON.parse(fs.readFileSync(scanPath, 'utf8'));
+    const observations = loadObservations()[ip] || {};
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=report_${ip}.pdf`);
+    const doc = new PDFDocument();
+    doc.pipe(res);
+    doc.fontSize(20).text('QRMS - Vulnerability Report', { align: 'center' });
+    doc.moveDown();
+    doc.fontSize(12).text(`IP: ${ip}`);
+    doc.text(`Date: ${new Date().toLocaleString()}`);
+    doc.moveDown();
+    doc.fontSize(16).text('Vulnerabilities:', { underline: true });
+    doc.moveDown(0.5);
+    let vulnCount = 0;
+    (scanData.activos || []).forEach(a => {
+      (a.cves || []).forEach(cve => {
+        vulnCount++;
+        doc.fontSize(12).fillColor('black').text(`CVE: ${cve.id} | Score: ${cve.score || '-'} | Severity: ${cve.severity || '-'} | Service: ${a.name} ${a.product} ${a.version}`);
+        doc.fontSize(10).fillColor('gray').text(`Observation: ${observations[cve.id] || ''}`);
+        doc.moveDown(0.5);
+      });
+    });
+    if (vulnCount === 0) {
+      doc.fontSize(14).fillColor('green').text('No vulnerabilities detected for this IP.', { align: 'center' });
+    }
+    doc.end();
+  } catch (err) {
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=report_${ip}.pdf`);
+    const doc = new PDFDocument();
+    doc.pipe(res);
+    doc.fontSize(18).text('QRMS - Vulnerability Report', { align: 'center' });
+    doc.moveDown();
+    doc.fontSize(14).fillColor('red').text('An error occurred while generating the PDF report.', { align: 'center' });
+    doc.fontSize(10).fillColor('black').text(String(err));
+    doc.end();
+  }
 });
 
 export default router; 

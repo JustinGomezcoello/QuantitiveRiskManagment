@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +36,8 @@ const Index = () => {
   const [currentStep, setCurrentStep] = useState("");
   const [scanData, setScanData] = useState(null);
   const [error, setError] = useState("");
+  const [observations, setObservations] = useState({});
+  const [reportLoading, setReportLoading] = useState(false);
 
   const handleScan = async () => {
     setLoading(true);
@@ -62,6 +64,63 @@ const Index = () => {
       setLoading(false);
       setTimeout(() => setProgress(0), 2000);
     }
+  };
+
+  // Recuperar observaciones al cargar scanData
+  useEffect(() => {
+    if (scanData?.ip) {
+      fetch(`http://localhost:4000/api/report/observations?ip=${encodeURIComponent(scanData.ip)}`)
+        .then(res => res.json())
+        .then(setObservations)
+        .catch(() => setObservations({}));
+    }
+  }, [scanData?.ip]);
+
+  // Guardar observación en backend
+  const handleObservationChange = async (cve, value) => {
+    setObservations(prev => ({ ...prev, [cve]: value }));
+    if (scanData?.ip) {
+      await fetch('http://localhost:4000/api/report/observation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ip: scanData.ip, cve, observation: value })
+      });
+    }
+  };
+
+  // Exportar PDF
+  const handleExportPDF = async () => {
+    if (!scanData?.ip) return;
+    setReportLoading(true);
+    const res = await fetch(`http://localhost:4000/api/report/pdf?ip=${encodeURIComponent(scanData.ip)}`);
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `report_${scanData.ip}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setReportLoading(false);
+  };
+
+  // Exportar CSV
+  const handleExportCSV = () => {
+    if (!scanData?.activos) return;
+    let csv = 'CVE,Score,Severity,Service,Observation\n';
+    scanData.activos.forEach(a => {
+      (a.cves || []).forEach(cve => {
+        csv += `${cve.id},${cve.score || ''},${cve.severity || ''},"${a.name} ${a.product} ${a.version}","${observations[cve.id] || ''}"\n`;
+      });
+    });
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `report_${scanData.ip}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   };
 
   // Adaptar datos para los componentes
@@ -110,10 +169,6 @@ const Index = () => {
                 <Activity className="h-3 w-3 mr-1" />
                 System Active
               </Badge>
-              <Button variant="outline" className="text-slate-300 border-slate-600">
-                <FileText className="h-4 w-4 mr-2" />
-                Reports
-              </Button>
             </div>
           </div>
         </div>
@@ -200,6 +255,10 @@ const Index = () => {
                 <Eye className="h-4 w-4 mr-2" />
                 Threat Intel
               </TabsTrigger>
+              <TabsTrigger value="reports" className="data-[state=active]:bg-blue-600">
+                <FileText className="h-4 w-4 mr-2" />
+                Reports
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="dashboard" className="space-y-6">
@@ -240,6 +299,67 @@ const Index = () => {
 
             <TabsContent value="intel">
               <ThreatIntel ip={ip} shodanData={scanData.shodan} />
+            </TabsContent>
+
+            <TabsContent value="reports">
+              <div className="space-y-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-bold text-white">Vulnerability Report for {scanData?.ip}</h2>
+                  <div className="flex gap-2">
+                    <Button onClick={handleExportPDF} disabled={reportLoading} className="bg-blue-700 text-white">
+                      {reportLoading ? 'Exporting PDF...' : 'Export PDF'}
+                    </Button>
+                    <Button onClick={handleExportCSV} className="bg-green-700 text-white">
+                      Export CSV
+                    </Button>
+                  </div>
+                </div>
+                <div className="overflow-x-auto rounded-lg bg-white/90 p-4">
+                  <table className="min-w-full text-base">
+                    <thead>
+                      <tr className="bg-blue-900/90 text-white">
+                        <th className="px-4 py-2">CVE</th>
+                        <th className="px-4 py-2">Score</th>
+                        <th className="px-4 py-2">Severity</th>
+                        <th className="px-4 py-2">Service</th>
+                        <th className="px-4 py-2">Suggested Treatment</th>
+                        <th className="px-4 py-2">Observations/Recommendations</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {scanData?.activos?.flatMap((a, idxA) =>
+                        (a.cves || []).map((cve, idxC) => {
+                          // Lógica de tratamiento sugerido (igual que en backend)
+                          let treatment = 'ACCEPT';
+                          if (a.riesgo >= 40) treatment = 'AVOID';
+                          else if (a.riesgo >= 20) treatment = 'MITIGATE';
+                          else if (a.riesgo >= 10) treatment = 'TRANSFER';
+                          return (
+                            <tr key={a.service + cve.id} className={((idxA + idxC) % 2 === 0) ? 'bg-slate-100' : 'bg-white'}>
+                              <td className="px-4 py-2 font-mono text-blue-700 font-semibold">{cve.id}</td>
+                              <td className="px-4 py-2">{cve.score || 'N/A'}</td>
+                              <td className="px-4 py-2">{cve.severity || 'N/A'}</td>
+                              <td className="px-4 py-2">{a.name} {a.product} {a.version}</td>
+                              <td className="px-4 py-2">{treatment}</td>
+                              <td className="px-4 py-2">
+                                <textarea
+                                  className="w-full bg-slate-100 border border-slate-300 rounded p-1 text-sm"
+                                  value={observations[cve.id] || ''}
+                                  onChange={e => handleObservationChange(cve.id, e.target.value)}
+                                  placeholder="Add your recommendation..."
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                  {(!scanData?.activos || scanData?.activos.every(a => !a.cves || a.cves.length === 0)) && (
+                    <div className="text-center text-slate-400 py-8">No vulnerabilities detected for this IP.</div>
+                  )}
+                </div>
+              </div>
             </TabsContent>
           </Tabs>
         )}

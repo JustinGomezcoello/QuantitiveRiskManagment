@@ -1,92 +1,122 @@
-# QRMS - Quantitative Risk Management System
+# Quantitative Risk Management System (QRMS)
 
-## 🚀 Run with Docker
+## Overview
 
-Build and start the entire project (frontend + backend) with one command:
-
-```sh
-# Build the Docker image
- docker build -t qrms .
-
-# Run the container
- docker run -p 80:80 -p 4000:4000 qrms
-```
-
-- The frontend will be available at http://localhost (port 80)
-- The backend API will be available at http://localhost:4000 (direct) and proxied as /api from the frontend
+**QRMS** (Quantitative Risk Management System) is an automated, end-to-end platform for cyber risk assessment, asset discovery, vulnerability detection, and risk reporting. Designed for real-world environments, QRMS leverages industry standards (ISO/IEC 27005, NIST 800-30, SPDP Ecuador, CIS Controls v8) to provide actionable, quantitative risk analysis and treatment recommendations for any IP address.
 
 ---
 
-# Welcome to your Lovable project
+## Key Features
 
-## Project info
+- **Automated Asset Discovery:**
+  - Enter any IP (public or private) and QRMS will scan using Nmap (`nmap -sV --script vuln <IP> -oX scan_result.xml`).
+  - Extracts active services, versions, open ports, detected OS, and frameworks.
 
-**URL**: https://lovable.dev/projects/a3ff21ed-7ef2-4eea-b73d-30032ba50c0e
+- **Asset Classification:**
+  - Classifies each detected service as Infrastructure, Application, or Database.
+  - Assigns CIA (Confidentiality, Integrity, Availability) ratings (1–5 scale) and business criticality.
 
-## How can I edit this code?
+- **Threat Intelligence Integration:**
+  - Queries the real Shodan API for public exposure, scan history, geolocation, ISP, and technical details.
+  - Combines Shodan data with Nmap results for a comprehensive asset profile.
 
-There are several ways of editing your application.
+- **Vulnerability Detection:**
+  - For each detected service, queries the real NVD API for CVEs, CVSS scores, severity, and technical summaries.
+  - Uses your real NVD API key for up-to-date vulnerability data.
 
-**Use Lovable**
+- **Quantitative Risk Calculation:**
+  - Calculates risk using: `RISK = PROBABILITY (CVSS) × IMPACT (CIA + Business Criticality)`.
+  - Impact is computed as the average CIA plus a business criticality factor.
+  - All risk calculations are based on international standards.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/a3ff21ed-7ef2-4eea-b73d-30032ba50c0e) and start prompting.
+- **Risk Visualization:**
+  - Generates a 5x5 heatmap (Impact vs. Probability) with color-coded risk levels.
+  - Each asset is plotted on the matrix for clear prioritization.
 
-Changes made via Lovable will be committed automatically to this repo.
+- **Risk Prioritization & Treatment:**
+  - Prioritizes risks by CVE severity, asset role, and public exposure.
+  - Suggests real treatment strategies: ACCEPT, MITIGATE, TRANSFER, AVOID, with professional guidance for each.
 
-**Use your preferred IDE**
+- **Residual Risk Calculation:**
+  - After mitigation, re-scan and compare new risk scores to show risk evolution over time.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+- **Automated Technical Reporting:**
+  - Generates PDF and CSV reports per IP, including detected assets, vulnerabilities, heatmap, suggested treatments, and residual risk.
+  - Dashboard with KPIs: scan time, CVEs detected, % of vulnerable services, and more.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- **Continuous Monitoring & Alerts:**
+  - Schedules automatic scans every 7 days.
+  - Monitors NVD for new CVEs affecting previously scanned assets.
+  - Sends alerts via email (and optionally Telegram/Slack).
 
-Follow these steps:
+- **Quality Indicators:**
+  - ≥3 keywords analyzed per scan
+  - ≥90% correct asset categorization
+  - <2s response per keyword
+  - 100% scan history retention
+
+- **Standards Compliance:**
+  - ISO/IEC 27005:2022, NIST SP 800-30 Rev.1, SPDP Ecuador 2025, CIS Controls v8
+
+---
+
+## Technology Stack
+- **Frontend:** React, Vite, TypeScript, Tailwind CSS, shadcn-ui
+- **Backend:** Node.js, Express, Nmap, Shodan API, NVD API, PDFKit
+- **Containerization:** Docker, Nginx (for SPA routing and API proxy)
+
+---
+
+## How to Run
+
+### Option 1: Docker Compose (Recommended)
+
+Build and start the entire system (frontend + backend) with a single command:
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+docker-compose up -d
+```
+- The frontend will be available at: http://localhost
+- The backend API will be available at: http://localhost:4000 (and proxied as /api from the frontend)
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+To stop the system:
+```sh
+docker-compose down
 ```
 
-**Edit a file directly in GitHub**
+### Option 2: Docker (Manual)
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```sh
+docker build -t qrms .
+docker run -p 80:80 -p 4000:4000 qrms
+```
 
-**Use GitHub Codespaces**
+---
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Usage
+1. Open http://localhost in your browser.
+2. Enter an IP address to scan.
+3. View detected assets, vulnerabilities, risk heatmap, prioritization, and threat intelligence.
+4. Add recommendations, export reports (PDF/CSV), and monitor risk evolution.
+5. The system will schedule periodic scans and alert you to new threats automatically.
 
-## What technologies are used for this project?
+---
 
-This project is built with:
+## API Keys
+- **Shodan API Key:** `PPv207fG0kjk1xNr818CnECsWfkNWOMF`
+- **NVD API Key:** `3bafed90-e81d-43e4-b9c7-1bf44e845ce4`
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+These are already integrated in the backend for real-time data.
 
-## How can I deploy this project?
+---
 
-Simply open [Lovable](https://lovable.dev/projects/a3ff21ed-7ef2-4eea-b73d-30032ba50c0e) and click on Share -> Publish.
+## References
+- ISO/IEC 27005:2022
+- NIST SP 800-30 Rev.1
+- SPDP Ecuador 2025
+- CIS Controls v8
 
-## Can I connect a custom domain to my Lovable project?
+---
 
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+## License
+This project is for educational and professional demonstration purposes. Use responsibly and in accordance with applicable laws and standards.

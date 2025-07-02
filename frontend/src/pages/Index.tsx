@@ -39,6 +39,8 @@ const Index = () => {
   const [observations, setObservations] = useState({});
   const [reportLoading, setReportLoading] = useState(false);
 
+  const API_URL = import.meta.env.VITE_API_URL;
+
   const handleScan = async () => {
     setLoading(true);
     setProgress(10);
@@ -46,7 +48,7 @@ const Index = () => {
     setError("");
     setScanData(null);
     try {
-      const res = await fetch("http://localhost:4000/api/scan", {
+      const res = await fetch(`${API_URL}/scan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ip })
@@ -69,7 +71,7 @@ const Index = () => {
   // Recuperar observaciones al cargar scanData
   useEffect(() => {
     if (scanData?.ip) {
-      fetch(`http://localhost:4000/api/report/observations?ip=${encodeURIComponent(scanData.ip)}`)
+      fetch(`${API_URL}/report/observations?ip=${encodeURIComponent(scanData.ip)}`)
         .then(res => res.json())
         .then(setObservations)
         .catch(() => setObservations({}));
@@ -80,7 +82,7 @@ const Index = () => {
   const handleObservationChange = async (cve, value) => {
     setObservations(prev => ({ ...prev, [cve]: value }));
     if (scanData?.ip) {
-      await fetch('http://localhost:4000/api/report/observation', {
+      await fetch(`${API_URL}/report/observation`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ip: scanData.ip, cve, observation: value })
@@ -92,7 +94,7 @@ const Index = () => {
   const handleExportPDF = async () => {
     if (!scanData?.ip) return;
     setReportLoading(true);
-    const res = await fetch(`http://localhost:4000/api/report/pdf?ip=${encodeURIComponent(scanData.ip)}`);
+    const res = await fetch(`${API_URL}/report/pdf?ip=${encodeURIComponent(scanData.ip)}`);
     const blob = await res.blob();
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');

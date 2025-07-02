@@ -1,0 +1,21 @@
+version: '3.8'
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "4000:4000"
+    container_name: qrms-backend
+    networks:
+      - qrms-net
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    container_name: qrms-frontend
+    depends_on:
+      - backend
+    networks:
+      - qrms-net
+networks:
+  qrms-net:
+    driver: bridge 

@@ -2,6 +2,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { ExternalLink, AlertTriangle, Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useState } from "react";
 
 interface CVE {
   id: string;
@@ -78,8 +79,74 @@ function getTreatmentDescription(treatment: string) {
 }
 
 export const RiskPrioritizationTable = ({ assets }: RiskPrioritizationTableProps) => {
+  const [observations, setObservations] = useState<{ [key: number]: string }>({});
+  const [recommendations, setRecommendations] = useState("");
+
+  // CSV Export
+  const handleExportCSV = () => {
+    let csv = 'Asset/Service,Version,Probability (CVSS),CIA,Impact (CIA + Criticality),Total Risk,Suggested Treatment,Observations\n';
+    assets.forEach((asset, idx) => {
+      // Format CIA as a string if it's an object
+      let ciaString = '-';
+      if (typeof asset.cia === 'string') {
+        ciaString = asset.cia;
+      } else if (
+        asset.cia &&
+        typeof asset.cia === 'object' &&
+        ('confidentiality' in asset.cia || 'confidencialidad' in asset.cia || 'integrity' in asset.cia || 'integridad' in asset.cia || 'availability' in asset.cia || 'disponibilidad' in asset.cia)
+      ) {
+        const c = (asset.cia as any).confidentiality ?? (asset.cia as any).confidencialidad ?? '-';
+        const i = (asset.cia as any).integrity ?? (asset.cia as any).integridad ?? '-';
+        const a = (asset.cia as any).availability ?? (asset.cia as any).disponibilidad ?? '-';
+        ciaString = `${c}/${i}/${a}`;
+      }
+      csv += `"${asset.service || '-'}","${asset.version || '-'}","${asset.probabilidad ?? '-'}","${ciaString}","${asset.impacto ?? '-'}","${asset.riesgo ?? '-'}","${asset.tratamiento || '-'}","${observations[idx] || ''}"
+`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'risk_identification.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
+  // Risk action explanations and links
+  const riskActionInfo: Record<string, { desc: string; link: string; linkLabel: string }> = {
+    AVOID: {
+      desc: 'Avoiding risk means eliminating the activity or asset that exposes the organization to the risk. This is appropriate when the risk is unacceptable and cannot be mitigated or transferred. Example: Discontinue a vulnerable service.',
+      link: 'https://www.ncsc.gov.uk/collection/risk-management/understanding-risk-treatment-options',
+      linkLabel: 'NCSC: Risk Treatment Options',
+    },
+    MITIGATE: {
+      desc: 'Mitigating risk involves taking actions to reduce the likelihood or impact of the risk. This can include applying patches, improving configurations, or implementing additional controls.',
+      link: 'https://www.cisa.gov/news-events/news/mitigating-cybersecurity-risks',
+      linkLabel: 'CISA: Mitigating Cybersecurity Risks',
+    },
+    TRANSFER: {
+      desc: 'Transferring risk means shifting the risk to a third party, such as through insurance or outsourcing. This is suitable when the organization cannot fully mitigate the risk internally.',
+      link: 'https://www.iso.org/iso-31000-risk-management.html',
+      linkLabel: 'ISO 31000: Risk Management',
+    },
+    ACCEPT: {
+      desc: 'Accepting risk means acknowledging the risk and choosing not to take any action, typically because the cost of mitigation exceeds the potential impact or the risk is within tolerance.',
+      link: 'https://www.nist.gov/itl/smallbusinesscyber/guidance-topic/risk-acceptance',
+      linkLabel: 'NIST: Risk Acceptance Guidance',
+    },
+  };
+
   return (
     <div className="space-y-4">
+      <div className="flex justify-end mb-2">
+        <button
+          className="bg-blue-700 hover:bg-blue-800 text-white font-bold py-2 px-4 rounded"
+          onClick={handleExportCSV}
+        >
+          Export to CSV
+        </button>
+      </div>
       <div>
         <h3 className="text-2xl font-bold text-white mb-1 flex items-center">
           <AlertTriangle className="h-5 w-5 text-blue-400 mr-2" />
@@ -172,6 +239,7 @@ export const RiskPrioritizationTable = ({ assets }: RiskPrioritizationTableProps
                   </Tooltip>
                 </TooltipProvider>
               </TableHead>
+              <TableHead className="text-white font-bold px-6 py-4 text-center">Observations</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -236,11 +304,18 @@ export const RiskPrioritizationTable = ({ assets }: RiskPrioritizationTableProps
                       <TooltipTrigger asChild>
                         <span>
                           <Badge className={`capitalize px-3 py-1 text-base ${asset.tratamiento === "AVOID" ? "bg-red-700 text-white" : asset.tratamiento === "MITIGATE" ? "bg-orange-600 text-white" : asset.tratamiento === "TRANSFER" ? "bg-yellow-600 text-black" : "bg-green-700 text-white"}`}>{asset.tratamiento}</Badge>
-                          <Info className="inline h-4 w-4 ml-1 text-blue-400 cursor-pointer align-middle" />
                         </span>
                       </TooltipTrigger>
                       <TooltipContent className="bg-slate-800 border-slate-600 text-white max-w-xs">
-                        {getTreatmentDescription(asset.tratamiento)}
+                        <div className="mb-2">{riskActionInfo[asset.tratamiento]?.desc}</div>
+                        <a
+                          href={riskActionInfo[asset.tratamiento]?.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-400 underline text-xs"
+                        >
+                          {riskActionInfo[asset.tratamiento]?.linkLabel}
+                        </a>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -252,10 +327,28 @@ export const RiskPrioritizationTable = ({ assets }: RiskPrioritizationTableProps
                     <Badge className="bg-slate-600 text-white px-3 py-1 text-base">Internal</Badge>
                   )}
                 </TableCell>
+                <TableCell className="align-top text-center px-6 py-4">
+                  <textarea
+                    className="w-full bg-slate-100 border border-slate-300 rounded p-1 text-sm"
+                    value={observations[idx] || ''}
+                    onChange={e => setObservations({ ...observations, [idx]: e.target.value })}
+                    placeholder="Add your observation..."
+                  />
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
+      </div>
+      <div className="mt-6">
+        <h4 className="text-lg font-bold text-white mb-2">Recommendations</h4>
+        <textarea
+          className="w-full bg-slate-100 border border-slate-300 rounded p-2 text-base"
+          rows={3}
+          value={recommendations}
+          onChange={e => setRecommendations(e.target.value)}
+          placeholder="Enter general suggestions or insights here..."
+        />
       </div>
     </div>
   );

@@ -81,12 +81,22 @@ function getTreatmentDescription(treatment: string) {
 export const RiskPrioritizationTable = ({ assets }: RiskPrioritizationTableProps) => {
   const [observations, setObservations] = useState<{ [key: number]: string }>({});
   const [recommendations, setRecommendations] = useState("");
+  const [resolved, setResolved] = useState<{ [key: number]: boolean }>({});
+  const [resolveMsg, setResolveMsg] = useState<{ [key: number]: string }>({});
 
   // CSV Export
   const handleExportCSV = () => {
-    let csv = 'Asset/Service,Version,Probability (CVSS),CIA,Impact (CIA + Criticality),Total Risk,Suggested Treatment,Observations\n';
-    assets.forEach((asset, idx) => {
-      // Format CIA as a string if it's an object
+    let csv = 'Asset/Service,Version,Detected CVEs,Probability (CVSS),CIA,Impact (CIA + Criticality),Total Risk,Suggested Treatment,External Accessibility,Observations,Recommendations\n';
+    assets.filter(asset => (asset.riesgo && asset.riesgo > 0) || (asset.cves && asset.cves.length > 0)).forEach((asset, idx) => {
+      // Asset/Service
+      const service = asset.service || '-';
+      // Version
+      const version = asset.version || '-';
+      // Detected CVEs
+      const detectedCVEs = asset.cves && asset.cves.length > 0 ? asset.cves.map(cve => cve.id).join(', ') : '-';
+      // Probability (CVSS)
+      const probability = (asset.probabilidad !== undefined && asset.probabilidad !== null) ? asset.probabilidad : '-';
+      // CIA
       let ciaString = '-';
       if (typeof asset.cia === 'string') {
         ciaString = asset.cia;
@@ -100,7 +110,19 @@ export const RiskPrioritizationTable = ({ assets }: RiskPrioritizationTableProps
         const a = (asset.cia as any).availability ?? (asset.cia as any).disponibilidad ?? '-';
         ciaString = `${c}/${i}/${a}`;
       }
-      csv += `"${asset.service || '-'}","${asset.version || '-'}","${asset.probabilidad ?? '-'}","${ciaString}","${asset.impacto ?? '-'}","${asset.riesgo ?? '-'}","${asset.tratamiento || '-'}","${observations[idx] || ''}"
+      // Impact
+      const impact = (asset.impacto !== undefined && asset.impacto !== null) ? asset.impacto : '-';
+      // Total Risk
+      const totalRisk = (asset.riesgo !== undefined && asset.riesgo !== null) ? asset.riesgo : '-';
+      // Suggested Treatment
+      const treatment = asset.tratamiento || '-';
+      // External Accessibility
+      const external = asset.shodanExposed ? 'Public' : 'Internal';
+      // Observations
+      const observation = observations[idx] || '';
+      // Recommendations (same for all rows)
+      const recs = recommendations || '';
+      csv += `"${service}","${version}","${detectedCVEs}","${probability}","${ciaString}","${impact}","${totalRisk}","${treatment}","${external}","${observation}","${recs}"
 `;
     });
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -117,25 +139,47 @@ export const RiskPrioritizationTable = ({ assets }: RiskPrioritizationTableProps
   const riskActionInfo: Record<string, { desc: string; link: string; linkLabel: string }> = {
     AVOID: {
       desc: 'Avoiding risk means eliminating the activity or asset that exposes the organization to the risk. This is appropriate when the risk is unacceptable and cannot be mitigated or transferred. Example: Discontinue a vulnerable service.',
-      link: 'https://www.ncsc.gov.uk/collection/risk-management/understanding-risk-treatment-options',
-      linkLabel: 'NCSC: Risk Treatment Options',
+      link: 'https://www.techtarget.com/searchsecurity/definition/risk-avoidance',
+      linkLabel: 'NIST Glossary: Risk Avoidance',
     },
     MITIGATE: {
       desc: 'Mitigating risk involves taking actions to reduce the likelihood or impact of the risk. This can include applying patches, improving configurations, or implementing additional controls.',
-      link: 'https://www.cisa.gov/news-events/news/mitigating-cybersecurity-risks',
+      link: 'https://www.indeed.com/career-advice/career-development/risk-mitigation-strategies',
       linkLabel: 'CISA: Mitigating Cybersecurity Risks',
     },
     TRANSFER: {
       desc: 'Transferring risk means shifting the risk to a third party, such as through insurance or outsourcing. This is suitable when the organization cannot fully mitigate the risk internally.',
-      link: 'https://www.iso.org/iso-31000-risk-management.html',
-      linkLabel: 'ISO 31000: Risk Management',
+      link: 'https://corporatefinanceinstitute.com/resources/career-map/sell-side/risk-management/risk-transfer/',
+      linkLabel: 'NIST: Risk Management (Transfer)',
     },
     ACCEPT: {
       desc: 'Accepting risk means acknowledging the risk and choosing not to take any action, typically because the cost of mitigation exceeds the potential impact or the risk is within tolerance.',
-      link: 'https://www.nist.gov/itl/smallbusinesscyber/guidance-topic/risk-acceptance',
-      linkLabel: 'NIST: Risk Acceptance Guidance',
+      link: 'https://www.investopedia.com/terms/a/accepting-risk.asp',
+      linkLabel: 'NIST Glossary: Risk Acceptance',
     },
   };
+
+  function handleResolve(idx: number, action: string) {
+    setResolved(prev => ({ ...prev, [idx]: true }));
+    let msg = '';
+    switch (action) {
+      case 'AVOID':
+        msg = 'Risk marked as avoided. Please ensure the asset is discontinued or isolated.';
+        break;
+      case 'MITIGATE':
+        msg = 'Risk marked as mitigated. Please apply the recommended patches and controls.';
+        break;
+      case 'TRANSFER':
+        msg = 'Risk marked as transferred. Please coordinate with your third-party provider or insurer.';
+        break;
+      case 'ACCEPT':
+        msg = 'Risk marked as accepted. Please document and monitor this risk periodically.';
+        break;
+      default:
+        msg = 'Risk marked as resolved.';
+    }
+    setResolveMsg(prev => ({ ...prev, [idx]: msg }));
+  }
 
   return (
     <div className="space-y-4">
@@ -319,6 +363,16 @@ export const RiskPrioritizationTable = ({ assets }: RiskPrioritizationTableProps
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
+                  <button
+                    className={`ml-2 mt-2 px-3 py-1 rounded font-bold ${resolved[idx] ? 'bg-green-400 text-white cursor-not-allowed' : 'bg-blue-700 hover:bg-blue-800 text-white'}`}
+                    onClick={() => handleResolve(idx, asset.tratamiento)}
+                    disabled={resolved[idx]}
+                  >
+                    {resolved[idx] ? 'Resolved' : 'Apply'}
+                  </button>
+                  {resolved[idx] && (
+                    <div className="mt-2 text-green-700 text-xs font-semibold">{resolveMsg[idx]}</div>
+                  )}
                 </TableCell>
                 <TableCell className="align-top text-center px-6 py-4">
                   {asset.shodanExposed ? (

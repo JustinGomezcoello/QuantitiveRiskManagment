@@ -18,12 +18,10 @@ import {
   Globe,
   Activity,
   Target,
-  FileText,
   Clock
 } from "lucide-react";
 import { DashboardStats } from "@/components/qrms/DashboardStats";
 import { RiskMatrix } from "@/components/qrms/RiskMatrix";
-import { VulnerabilityList } from "@/components/qrms/VulnerabilityList";
 import { AssetInventory } from "@/components/qrms/AssetInventory";
 import { ScanProgress } from "@/components/qrms/ScanProgress";
 import { ThreatIntel } from "@/components/qrms/ThreatIntel";
@@ -239,27 +237,19 @@ const Index = () => {
               </TabsTrigger>
               <TabsTrigger value="assets" className="data-[state=active]:bg-blue-600">
                 <Database className="h-4 w-4 mr-2" />
-                Assets
+                Asset Valuation
               </TabsTrigger>
-              <TabsTrigger value="vulnerabilities" className="data-[state=active]:bg-blue-600">
-                <AlertTriangle className="h-4 w-4 mr-2" />
-                Vulnerabilities
+              <TabsTrigger value="risk-identification" className="data-[state=active]:bg-blue-600">
+                <TrendingUp className="h-4 w-4 mr-2" />
+                Risk Identification
               </TabsTrigger>
               <TabsTrigger value="risk-matrix" className="data-[state=active]:bg-blue-600">
                 <Network className="h-4 w-4 mr-2" />
                 Risk Matrix
               </TabsTrigger>
-              <TabsTrigger value="prioritization" className="data-[state=active]:bg-blue-600">
-                <TrendingUp className="h-4 w-4 mr-2" />
-                Prioritization
-              </TabsTrigger>
               <TabsTrigger value="intel" className="data-[state=active]:bg-blue-600">
                 <Eye className="h-4 w-4 mr-2" />
                 Threat Intel
-              </TabsTrigger>
-              <TabsTrigger value="reports" className="data-[state=active]:bg-blue-600">
-                <FileText className="h-4 w-4 mr-2" />
-                Reports
               </TabsTrigger>
             </TabsList>
 
@@ -283,85 +273,16 @@ const Index = () => {
               )}
             </TabsContent>
 
-            <TabsContent value="vulnerabilities">
-              {vulnerabilities.length === 0 ? (
-                <div className="text-center text-slate-400 py-8">No vulnerabilities detected for this IP.</div>
-              ) : (
-                <VulnerabilityList vulnerabilities={vulnerabilities} />
-              )}
+            <TabsContent value="risk-identification">
+              <RiskPrioritizationTable assets={scanData?.activos || []} />
             </TabsContent>
 
             <TabsContent value="risk-matrix">
               <RiskMatrix assets={assets} vulnerabilities={vulnerabilities} />
             </TabsContent>
 
-            <TabsContent value="prioritization">
-              <RiskPrioritizationTable assets={scanData?.activos || []} />
-            </TabsContent>
-
             <TabsContent value="intel">
               <ThreatIntel ip={ip} shodanData={scanData.shodan} />
-            </TabsContent>
-
-            <TabsContent value="reports">
-              <div className="space-y-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-bold text-white">Vulnerability Report for {scanData?.ip}</h2>
-                  <div className="flex gap-2">
-                    <Button onClick={handleExportPDF} disabled={reportLoading} className="bg-blue-700 text-white">
-                      {reportLoading ? 'Exporting PDF...' : 'Export PDF'}
-                    </Button>
-                    <Button onClick={handleExportCSV} className="bg-green-700 text-white">
-                      Export CSV
-                    </Button>
-                  </div>
-                </div>
-                <div className="overflow-x-auto rounded-lg bg-white/90 p-4">
-                  <table className="min-w-full text-base">
-                    <thead>
-                      <tr className="bg-blue-900/90 text-white">
-                        <th className="px-4 py-2">CVE</th>
-                        <th className="px-4 py-2">Score</th>
-                        <th className="px-4 py-2">Severity</th>
-                        <th className="px-4 py-2">Service</th>
-                        <th className="px-4 py-2">Suggested Treatment</th>
-                        <th className="px-4 py-2">Observations/Recommendations</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {scanData?.activos?.flatMap((a, idxA) =>
-                        (a.cves || []).map((cve, idxC) => {
-                          // Lógica de tratamiento sugerido (igual que en backend)
-                          let treatment = 'ACCEPT';
-                          if (a.riesgo >= 40) treatment = 'AVOID';
-                          else if (a.riesgo >= 20) treatment = 'MITIGATE';
-                          else if (a.riesgo >= 10) treatment = 'TRANSFER';
-                          return (
-                            <tr key={a.service + cve.id} className={((idxA + idxC) % 2 === 0) ? 'bg-slate-100' : 'bg-white'}>
-                              <td className="px-4 py-2 font-mono text-blue-700 font-semibold">{cve.id}</td>
-                              <td className="px-4 py-2">{cve.score || 'N/A'}</td>
-                              <td className="px-4 py-2">{cve.severity || 'N/A'}</td>
-                              <td className="px-4 py-2">{a.name} {a.product} {a.version}</td>
-                              <td className="px-4 py-2">{treatment}</td>
-                              <td className="px-4 py-2">
-                                <textarea
-                                  className="w-full bg-slate-100 border border-slate-300 rounded p-1 text-sm"
-                                  value={observations[cve.id] || ''}
-                                  onChange={e => handleObservationChange(cve.id, e.target.value)}
-                                  placeholder="Add your recommendation..."
-                                />
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                  {(!scanData?.activos || scanData?.activos.every(a => !a.cves || a.cves.length === 0)) && (
-                    <div className="text-center text-slate-400 py-8">No vulnerabilities detected for this IP.</div>
-                  )}
-                </div>
-              </div>
             </TabsContent>
           </Tabs>
         )}

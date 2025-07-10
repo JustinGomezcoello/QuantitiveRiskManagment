@@ -18,7 +18,9 @@ import {
   Globe,
   Activity,
   Target,
-  Clock
+  Clock,
+  Mail,
+  CheckCircle
 } from "lucide-react";
 import { DashboardStats } from "@/components/qrms/DashboardStats";
 import { RiskMatrix } from "@/components/qrms/RiskMatrix";
@@ -26,6 +28,7 @@ import { AssetInventory } from "@/components/qrms/AssetInventory";
 import { ScanProgress } from "@/components/qrms/ScanProgress";
 import { ThreatIntel } from "@/components/qrms/ThreatIntel";
 import { RiskPrioritizationTable } from "@/components/qrms/RiskPrioritizationTable";
+import { sendScanReport, type ScanResult } from "@/services/emailService";
 
 const Index = () => {
   const [ip, setIp] = useState("");
@@ -36,6 +39,8 @@ const Index = () => {
   const [error, setError] = useState("");
   const [observations, setObservations] = useState({});
   const [reportLoading, setReportLoading] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const [emailSending, setEmailSending] = useState(false);
 
   const API_URL = import.meta.env.VITE_API_URL;
 
@@ -45,6 +50,7 @@ const Index = () => {
     setCurrentStep("Ejecutando Nmap...");
     setError("");
     setScanData(null);
+    setEmailSent(false);
     try {
       const res = await fetch(`${API_URL}/scan`, {
         method: "POST",
@@ -55,13 +61,25 @@ const Index = () => {
       setCurrentStep("Procesando resultados y consultando APIs...");
       if (!res.ok) throw new Error("Error en el escaneo");
       const data = await res.json();
-      setProgress(100);
-      setCurrentStep("¡Escaneo completo!");
+      setProgress(80);
+      setCurrentStep("Preparando reporte...");
       setScanData(data);
+      
+      // Enviar reporte por email
+      setProgress(90);
+      setCurrentStep("Enviando reporte por email...");
+      setEmailSending(true);
+      
+      const emailSuccess = await sendScanReport(data as ScanResult);
+      setEmailSent(emailSuccess);
+      
+      setProgress(100);
+      setCurrentStep(emailSuccess ? "¡Escaneo completo y reporte enviado!" : "¡Escaneo completo! (Error enviando email)");
     } catch (err) {
       setError("Error en el escaneo: " + err.message);
     } finally {
       setLoading(false);
+      setEmailSending(false);
       setTimeout(() => setProgress(0), 2000);
     }
   };
@@ -86,6 +104,15 @@ const Index = () => {
         body: JSON.stringify({ ip: scanData.ip, cve, observation: value })
       });
     }
+  };
+
+  // Reenviar reporte por email
+  const handleResendEmail = async () => {
+    if (!scanData) return;
+    setEmailSending(true);
+    const emailSuccess = await sendScanReport(scanData as ScanResult);
+    setEmailSent(emailSuccess);
+    setEmailSending(false);
   };
 
   // Exportar PDF
@@ -222,6 +249,23 @@ const Index = () => {
                 <div className="text-yellow-400 font-bold text-center mt-2">
                 Deep scan in progress. This may take several minutes depending on the network and the services detected.
                 </div>
+                {emailSending && (
+                  <div className="flex items-center justify-center space-x-2 text-blue-400 text-sm">
+                    <Mail className="h-4 w-4 animate-pulse" />
+                    <span>Enviando reporte a jhoelsuarez02@gmail.com...</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {emailSent && !loading && (
+              <div className="mt-4">
+                <Alert className="bg-green-900/20 border-green-700">
+                  <CheckCircle className="h-4 w-4 text-green-400" />
+                  <AlertDescription className="text-green-300">
+                    <strong>Reporte enviado exitosamente</strong> a jhoelsuarez02@gmail.com
+                  </AlertDescription>
+                </Alert>
               </div>
             )}
           </CardContent>
@@ -263,6 +307,56 @@ const Index = () => {
                   Found {dashboardStats.vulnerabilities.length} critical vulnerabilities requiring immediate attention.
                 </AlertDescription>
               </Alert>
+
+              {/* Botones de exportación y reenvío */}
+              <Card className="bg-slate-800/50 border-slate-700">
+                <CardHeader>
+                  <CardTitle className="text-white">Exportar Reporte</CardTitle>
+                  <CardDescription className="text-slate-400">
+                    Genere y comparta el reporte de análisis de riesgos
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-3">
+                    <Button 
+                      onClick={handleExportPDF}
+                      disabled={reportLoading}
+                      className="bg-red-600 hover:bg-red-700"
+                    >
+                      {reportLoading ? "Generando..." : "Exportar PDF"}
+                    </Button>
+                    <Button 
+                      onClick={handleExportCSV}
+                      variant="outline"
+                      className="border-slate-600 text-white hover:bg-slate-700"
+                    >
+                      Exportar CSV
+                    </Button>
+                    <Button 
+                      onClick={handleResendEmail}
+                      disabled={emailSending}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      {emailSending ? (
+                        <>
+                          <Mail className="h-4 w-4 mr-2 animate-pulse" />
+                          Enviando...
+                        </>
+                      ) : (
+                        <>
+                          <Mail className="h-4 w-4 mr-2" />
+                          {emailSent ? "Reenviar Email" : "Enviar por Email"}
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  {emailSent && (
+                    <p className="text-green-400 text-sm mt-2">
+                      ✓ Último reporte enviado a: jhoelsuarez02@gmail.com
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="assets">
